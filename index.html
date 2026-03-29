@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b0c10">
+  <meta name="description" content="Convert .mht/.mhtml to standalone HTML or ZIP in your browser.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-192.png">
   <title>MHTML → HTML Converter</title>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -490,6 +494,49 @@
     color: var(--amber);
     }
 
+
+    /* ── Install banner & footer ── */
+    .install-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+    }
+    .install-banner.on { display: flex; }
+    .install-copy {
+    font-size: .72rem;
+    color: var(--dim);
+    line-height: 1.6;
+    }
+    .install-btn {
+    background: var(--amber);
+    border: none;
+    color: #0b0c10;
+    font-family: 'Syne', sans-serif;
+    font-size: .72rem;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    }
+    .install-btn:hover { background: #f2ca6e; }
+
+    .app-footer {
+    margin-top: 22px;
+    font-size: .65rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.75;
+    letter-spacing: .03em;
+    }
+    .app-footer a {
+    color: var(--amber);
+    text-decoration: none;
+    }
+    .app-footer a:hover { text-decoration: underline; }
+
     /* ── Visibility helpers ── */
     .hidden { display: none !important;
     }
@@ -544,6 +591,10 @@
     }
     .pstep-msg { display: none;
     }
+    .install-banner.on {
+    flex-direction: column;
+    align-items: flex-start;
+    }
     .slabel { font-size: .6rem;
     }
     .dz-title { font-size: .9rem;
@@ -552,13 +603,14 @@
     }
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>
-  eruda.init();
-</script>
 </head>
 <body>
   <div class="wrap">
+
+    <div class="card install-banner" id="install-banner">
+      <div class="install-copy">Install this app for offline use and one-click launching from your home screen.</div>
+      <button class="install-btn" id="install-btn">Install App</button>
+    </div>
 
     <!-- Header -->
     <header class="hdr">
@@ -749,6 +801,10 @@
 
     <button id="reset-btn" class="">&#8617; Convert another file</button>
 
+    <footer class="app-footer">
+      Built by <strong>Mht2html contributors</strong> · Source: <a href="./README.md" target="_blank" rel="noopener noreferrer">Repository</a>
+    </footer>
+
   </div>
 
   <script>
@@ -772,6 +828,8 @@
     const resetBtn = document.getElementById('reset-btn');
     const btnDl = document.getElementById('btn-dl');
     const btnPrev = document.getElementById('btn-prev');
+    const installBanner = document.getElementById('install-banner');
+    const installBtn = document.getElementById('install-btn');
 
     let selectedFile = null;
     let outputBlob = null;
@@ -1357,6 +1415,39 @@
         });
         convertBtn.disabled = true;
         });
+
+
+    // ── PWA install / service worker ─────────────────────────────
+    let deferredPrompt = null;
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((err) => {
+          console.warn('Service worker registration failed:', err);
+        });
+      });
+    }
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferredPrompt = event;
+      installBanner.classList.add('on');
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        installBanner.classList.remove('on');
+      }
+      deferredPrompt = null;
+    });
+
+    window.addEventListener('appinstalled', () => {
+      installBanner.classList.remove('on');
+      deferredPrompt = null;
+    });
         </script>
         </body>
         </html>
