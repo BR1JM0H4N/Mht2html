@@ -1077,7 +1077,7 @@
 
         if (mode === 'embed') {
           const attrsWithoutSrc = `${before} ${after}`.replace(/\bsrc=(['"]).*?\1/i, '').trim();
-          return `<script${attrsWithoutSrc ? ' ' + attrsWithoutSrc : ''}>${asset.text}</script>`;
+          return `<script${attrsWithoutSrc ? ' ' + attrsWithoutSrc : ''}>${asset.text}<\/script>`;
         }
 
         const fn = filenameMap ? filenameMap.get(asset) : asset.filename;
