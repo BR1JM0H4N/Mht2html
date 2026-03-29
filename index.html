@@ -1092,7 +1092,6 @@
       });
 
       // 6) <style>
-        blocks
         html = html.replace(/(<style[^>]*>)([\s\S]*?)(<\/style>)/gi, (m, open, css, close) =>
         open + rewriteCSSURLs(css, assetMap, mode, filenameMap) + close
         );
