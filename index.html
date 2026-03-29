@@ -1066,23 +1066,20 @@
     });
 
     // 4) <script src="...">
-  </script>
-  html = html.replace(/<script([^>
-    ]*?)\bsrc=(['"])([^'"]+)\2([^>]*)>\s*<\/script>/gi,
+    html = html.replace(/<script([^>]*?)\bsrc=(['"])([^'"]+)\2([^>]*)>\s*<\/script>/gi,
       (match, before, q, url, after) => {
-      const asset = resolveAsset(url, assetMap);
-      if (!asset || !asset.text) return match;
-      if (mode === 'embed') {
-      const noSrc = (before + after).replace(/\s*\btype=(['"])[^'"]*\1/i, '').trim();
-      return `<script${noSrc ? ' '+noSrc : ''}>
-        ${asset.text}
-      </script>
-      `;
+        const asset = resolveAsset(url, assetMap);
+        if (!asset || !asset.text) return match;
+
+        if (mode === 'embed') {
+          const attrsWithoutSrc = `${before} ${after}`.replace(/\bsrc=(['"]).*?\1/i, '').trim();
+          return `<script${attrsWithoutSrc ? ' ' + attrsWithoutSrc : ''}>${asset.text}</script>`;
+        }
+
+        const fn = filenameMap ? filenameMap.get(asset) : asset.filename;
+        return match.replace(`src=${q}${url}${q}`, `src="assets/${fn}"`);
       }
-      const fn = filenameMap ? filenameMap.get(asset) : asset.filename;
-      return match.replace(`src=${q}${url}${q}`, `src="assets/${fn}"`);
-      }
-      );
+    );
 
       // 5) background="..."
       html = html.replace(/\bbackground=(['"])([^'"]+)\1/g, (m, q, url) => {
