@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MHTML → HTML Converter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+:root {
+    --bg: #0b0c10;
+    --s1: #12141a;
+    --s2: #181b22;
+    --s3: #1f2330;
+    --border: #252b38;
+    --border2: #303848;
+    --amber: #e8b84b;
+    --amber2: #c99830;
+    --amber-g: rgba(232,184,75,.10);
+    --amber-g2: rgba(232,184,75,.18);
+    --green: #52d68a;
+    --red: #ff6b6b;
+    --blue: #5b8bce;
+    --txt: #d8dce8;
+    --muted: #5b6475;
+    --dim: #8b95a8;
+    }
+    *, *::before, *::after { box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    }
+    html { scroll-behavior: smooth;
+    }
+
+    body {
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--bg);
+    color: var(--txt);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    }
+
+    /* ── Background ── */
+    body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image:
+    linear-gradient(var(--s1) 1px, transparent 1px),
+    linear-gradient(90deg, var(--s1) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 0%, black 30%, transparent 100%);
+    }
+    body::after {
+    content: '';
+    position: fixed;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 300px;
+    background: radial-gradient(ellipse, rgba(232,184,75,.07) 0%, transparent 70%);
+    z-index: 0;
+    pointer-events: none;
+    }
+
+    /* ── Layout ── */
+    .wrap {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 680px;
+    padding: 52px 20px 100px;
+    }
+
+    /* ── Header ── */
+    .hdr { text-align: center;
+    margin-bottom: 52px;
+    }
+    .hdr-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 14px 5px 10px;
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    margin-bottom: 22px;
+    font-size: .68rem;
+    letter-spacing: .08em;
+    color: var(--amber);
+    }
+    .hdr-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 6px var(--amber);
+    animation: pulsedot 2s ease infinite;
+    }
+    @keyframes pulsedot {
+    0%,100%{opacity: 1;
+    box-shadow: 0 0 6px var(--amber);
+    }
+    50%{opacity: .4;
+    box-shadow: 0 0 2px var(--amber);
+    }
+    }
+    h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.8rem, 5vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -.03em;
+    line-height: 1;
+    color: var(--txt);
+    }
+    h1 em { font-style: normal;
+    color: var(--amber);
+    }
+    .hdr-sub {
+    margin-top: 10px;
+    font-size: .7rem;
+    color: var(--muted);
+    letter-spacing: .07em;
+    }
+
+    /* ── Section label ── */
+    .slabel {
+    font-size: .63rem;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    }
+    .slabel::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    }
+
+    /* ── Card ── */
+    .card {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 14px;
+    animation: fadein .3s ease both;
+    }
+    @keyframes fadein { from{opacity: 0;
+    transform: translateY(8px)} to{opacity: 1;
+    transform: none} }
+
+    /* ── Dropzone ── */
+    #dropzone {
+    border: 2px dashed var(--border2);
+    border-radius: 10px;
+    padding: 44px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+    overflow: hidden;
+    }
+    #dropzone:hover, #dropzone.over {
+    border-color: var(--amber);
+    background: var(--amber-g);
+    }
+    #dropzone.over::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, var(--amber-g2), transparent 65%);
+    animation: glow 1.4s ease infinite;
+    }
+    @keyframes glow{0%,100%{opacity: .6}50%{opacity: 1}}
+
+    .dz-icon { display: block;
+    margin: 0 auto 16px;
+    width: 44px;
+    }
+    .dz-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    }
+    .dz-sub { font-size: .7rem;
+    color: var(--muted);
+    line-height: 1.6;
+    }
+    .dz-btn {
+    display: inline-block;
+    margin-top: 18px;
+    padding: 8px 20px;
+    background: var(--s2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .72rem;
+    color: var(--txt);
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+    user-select: none;
+    }
+    .dz-btn:hover { border-color: var(--amber);
+    color: var(--amber);
+    }
+    #file-input { display: none;
+    }
+
+    /* ── File badge ── */
+    .file-badge {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 11px 14px;
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    }
+    .file-badge.on { display: flex;
+    }
+    .fb-icon {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    background: var(--amber-g);
+    border: 1px solid var(--amber2);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    }
+    .fb-name { font-size: .78rem;
+    font-weight: 500;
+    }
+    .fb-size { font-size: .67rem;
+    color: var(--muted);
+    margin-top: 2px;
+    }
+    .fb-rm {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: color .15s, background .15s;
+    }
+    .fb-rm:hover { color: var(--red);
+    background: rgba(255,107,107,.1);
+    }
+
+    /* ── Format selector ── */
+    .fmt-grid { display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    }
+    .fmt-opt { position: relative;
+    }
+    .fmt-opt input { position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    }
+    .fmt-lbl {
+    display: block;
+    padding: 16px 14px;
+    background: var(--s2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    }
+    .fmt-opt input:checked ~ .fmt-lbl {
+    border-color: var(--amber);
+    background: var(--amber-g);
+    }
+    .fmt-icon { display: block;
+    margin-bottom: 10px;
+    color: var(--amber);
+    opacity: .85;
+    }
+    .fmt-opt input:checked ~ .fmt-lbl .fmt-icon { opacity: 1;
+    }
+    .fmt-name {
+    font-family: 'Syne', sans-serif;
+    font-size: .85rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+    }
+    .fmt-desc { font-size: .67rem;
+    color: var(--muted);
+    line-height: 1.55;
+    }
+
+    /* ── Convert button ── */
+    #convert-btn {
+    width: 100%;
+    padding: 15px;
+    background: var(--amber);
+    border: none;
+    border-radius: 10px;
+    font-family: 'Syne', sans-serif;
+    font-size: .95rem;
+    font-weight: 700;
+    color: #0b0c10;
+    cursor: pointer;
+    transition: background .2s, transform .15s, box-shadow .2s;
+    letter-spacing: .02em;
+    }
+    #convert-btn:hover:not(:disabled) {
+    background: #f2ca6e;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(232,184,75,.28);
+    }
+    #convert-btn:active:not(:disabled) { transform: translateY(0);
+    }
+    #convert-btn:disabled { opacity: .35;
+    cursor: not-allowed;
+    }
+
+    /* ── Progress ── */
+    .prog-steps { display: flex;
+    flex-direction: column;
+    gap: 11px;
+    }
+    .pstep {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    font-size: .76rem;
+    color: var(--muted);
+    transition: color .3s;
+    }
+    .pstep.active { color: var(--txt);
+    }
+    .pstep.done { color: var(--green);
+    }
+    .pstep-dot {
+    width: 9px;
+    height: 9px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--border2);
+    transition: background .3s, box-shadow .3s;
+    }
+    .pstep.active .pstep-dot {
+    background: var(--amber);
+    box-shadow: 0 0 10px rgba(232,184,75,.6);
+    animation: pdot 1s ease infinite;
+    }
+    .pstep.done .pstep-dot {
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(82,214,138,.4);
+    }
+    @keyframes pdot{0%,100%{opacity: 1}50%{opacity: .3}}
+    .pstep-msg { margin-left: auto;
+    font-size: .65rem;
+    color: var(--amber);
+    opacity: 0;
+    transition: opacity .3s;
+    }
+    .pstep.active .pstep-msg { opacity: 1;
+    }
+
+    /* ── Results ── */
+    .stats-row { display: grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+    }
+    .stat {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 14px 12px;
+    text-align: center;
+    }
+    .stat-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--amber);
+    line-height: 1;
+    }
+    .stat-lbl {
+    font-size: .62rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-top: 5px;
+    }
+    .res-btns { display: flex;
+    gap: 10px;
+    }
+    .btn-dl {
+    flex: 1;
+    padding: 13px;
+    background: var(--amber);
+    border: none;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: .88rem;
+    font-weight: 700;
+    color: #0b0c10;
+    cursor: pointer;
+    transition: background .2s, transform .15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    }
+    .btn-dl:hover { background: #f2ca6e;
+    transform: translateY(-1px);
+    }
+    .btn-prev {
+    padding: 13px 18px;
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: .88rem;
+    font-weight: 700;
+    color: var(--txt);
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    }
+    .btn-prev:hover { border-color: var(--amber);
+    color: var(--amber);
+    }
+
+    /* ── Error ── */
+    .err-inner {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    }
+    .err-icon { font-size: 1.4rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+    }
+    .err-title {
+    font-family: 'Syne', sans-serif;
+    font-size: .88rem;
+    font-weight: 700;
+    color: var(--red);
+    margin-bottom: 5px;
+    }
+    .err-msg { font-size: .73rem;
+    color: var(--dim);
+    line-height: 1.6;
+    }
+
+    /* ── Reset ── */
+    #reset-btn {
+    display: none;
+    width: 100%;
+    margin-top: 10px;
+    padding: 11px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .72rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+    }
+    #reset-btn.on { display: block;
+    }
+    #reset-btn:hover { border-color: var(--amber);
+    color: var(--amber);
+    }
+
+    /* ── Visibility helpers ── */
+    .hidden { display: none !important;
+    }
+    .vis-block { display: block;
+    }
+    .vis-flex { display: flex;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px;
+    }
+    ::-webkit-scrollbar-track { background: var(--bg);
+    }
+    ::-webkit-scrollbar-thumb { background: var(--border2);
+    border-radius: 3px;
+    }
+
+    /* ── Mobile ── */
+    html { overflow-x: hidden;
+    }
+    @media (max-width: 520px) {
+    .wrap { padding: 32px 14px 64px;
+    }
+    h1 { font-size: 1.9rem;
+    }
+    .hdr-sub { font-size: .62rem;
+    letter-spacing: .04em;
+    word-break: break-word;
+    }
+    .hdr { margin-bottom: 32px;
+    }
+    .card { padding: 16px;
+    }
+    #dropzone { padding: 32px 14px;
+    }
+    .fmt-grid { grid-template-columns: 1fr;
+    }
+    .stats-row { grid-template-columns: repeat(3,1fr);
+    gap: 7px;
+    }
+    .stat { padding: 11px 8px;
+    }
+    .stat-val { font-size: 1.2rem;
+    }
+    .stat-lbl { font-size: .58rem;
+    }
+    .res-btns { flex-direction: column;
+    }
+    .btn-prev { width: 100%;
+    }
+    .pstep { font-size: .72rem;
+    }
+    .pstep-msg { display: none;
+    }
+    .slabel { font-size: .6rem;
+    }
+    .dz-title { font-size: .9rem;
+    }
+    .dz-sub { font-size: .67rem;
+    }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- Header -->
+    <header class="hdr">
+      <div class="hdr-badge">
+        <span class="hdr-badge-dot"></span>
+        CLIENT-SIDE · NO UPLOAD · PRIVATE
+      </div>
+      <h1>MHTML <em>→</em> HTML</h1>
+      <p class="hdr-sub">
+        // CONVERT .MHT / .MHTML TO STANDALONE HTML — RUNS 100% IN YOUR BROWSER
+      </p>
+    </header>
+
+    <!-- Step 1: Upload -->
+    <div class="card" id="card-upload">
+      <p class="slabel">
+        01 — Upload file
+      </p>
+      <div id="dropzone">
+        <span class="dz-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="12" y1="12" x2="12" y2="18" />
+            <polyline points="9 15 12 18 15 15" />
+          </svg>
+        </span>
+        <div class="dz-title">
+          Drop your .mht / .mhtml file here
+        </div>
+        <div class="dz-sub">
+          Saved web pages from Chrome, Edge, IE, Firefox<br>or Outlook MHTML emails
+        </div>
+        <label class="dz-btn" for="file-input">Browse Files</label>
+        <input type="file" id="file-input" accept=".mht,.mhtml,.mhtml,.eml">
+      </div>
+      <div class="file-badge" id="file-badge">
+        <div class="fb-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+        </div>
+        <div>
+          <div class="fb-name" id="fb-name">
+            —
+          </div>
+          <div class="fb-size" id="fb-size">
+            —
+          </div>
+        </div>
+        <button class="fb-rm" id="fb-rm" title="Remove">✕</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Format -->
+    <div class="card" id="card-fmt">
+      <p class="slabel">
+        02 — Output format
+      </p>
+      <div class="fmt-grid">
+        <div class="fmt-opt">
+          <input type="radio" name="fmt" id="fmt-single" value="single" checked>
+          <label class="fmt-lbl" for="fmt-single">
+            <span class="fmt-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" />
+              </svg>
+            </span>
+            <div class="fmt-name">
+              Single-Page HTML
+            </div>
+            <div class="fmt-desc">
+              All images and CSS embedded as base64 data URIs. One portable .html file, opens anywhere.
+            </div>
+          </label>
+        </div>
+        <div class="fmt-opt">
+          <input type="radio" name="fmt" id="fmt-zip" value="zip">
+          <label class="fmt-lbl" for="fmt-zip">
+            <span class="fmt-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                <line x1="12" y1="11" x2="12" y2="17" /><polyline points="9 14 12 17 15 14" />
+              </svg>
+            </span>
+            <div class="fmt-name">
+              HTML + Assets ZIP
+            </div>
+            <div class="fmt-desc">
+              index.html + assets/ folder. Smaller file size, better for large pages with many images.
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Convert button -->
+    <button id="convert-btn" disabled>Convert →</button>
+
+    <!-- Progress card -->
+    <div class="card hidden" id="card-prog" style="margin-top:14px">
+      <p class="slabel">
+        Processing
+      </p>
+      <div class="prog-steps">
+        <div class="pstep" id="ps-read">
+          <span class="pstep-dot"></span>
+          Reading file
+          <span class="pstep-msg">working…</span>
+        </div>
+        <div class="pstep" id="ps-parse">
+          <span class="pstep-dot"></span>
+          Parsing MIME structure &amp; boundary
+          <span class="pstep-msg">working…</span>
+        </div>
+        <div class="pstep" id="ps-assets">
+          <span class="pstep-dot"></span>
+          Extracting embedded assets
+          <span class="pstep-msg">working…</span>
+        </div>
+        <div class="pstep" id="ps-html">
+          <span class="pstep-dot"></span>
+          Rewriting HTML references
+          <span class="pstep-msg">working…</span>
+        </div>
+        <div class="pstep" id="ps-pack">
+          <span class="pstep-dot"></span>
+          Packaging output
+          <span class="pstep-msg">working…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error card -->
+    <div class="card hidden" id="card-err" style="margin-top:14px;border-color:rgba(255,107,107,.25)">
+      <div class="err-inner">
+        <span class="err-icon">&#9888;</span>
+        <div>
+          <div class="err-title">
+            Conversion failed
+          </div>
+          <div class="err-msg" id="err-msg">
+            Unknown error.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results card -->
+    <div class="card hidden" id="card-res" style="margin-top:14px;border-color:rgba(82,214,138,.2)">
+      <p class="slabel" style="color:var(--green)">
+        ✓ Conversion complete
+      </p>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-val" id="s-assets">
+            0
+          </div>
+          <div class="stat-lbl">
+            Assets
+          </div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="s-images">
+            0
+          </div>
+          <div class="stat-lbl">
+            Images
+          </div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="s-size">
+            0 KB
+          </div>
+          <div class="stat-lbl">
+            Output size
+          </div>
+        </div>
+      </div>
+      <div class="res-btns">
+        <button class="btn-dl" id="btn-dl">&#8595; Download</button>
+        <button class="btn-prev" id="btn-prev">&#9654; Preview</button>
+      </div>
+    </div>
+
+    <button id="reset-btn" class="">&#8617; Convert another file</button>
+
+  </div>
+
+  <script>
+    // ────────────────────────────────────────────────────────────
+    //  MHTML → HTML  Converter
+    //  Runs entirely in the browser — no server, no upload.
+    // ────────────────────────────────────────────────────────────
+
+    // ── DOM refs ─────────────────────────────────────────────────
+    const dz = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const badge = document.getElementById('file-badge');
+    const fbName = document.getElementById('fb-name');
+    const fbSize = document.getElementById('fb-size');
+    const fbRm = document.getElementById('fb-rm');
+    const convertBtn = document.getElementById('convert-btn');
+    const cardProg = document.getElementById('card-prog');
+    const cardErr = document.getElementById('card-err');
+    const cardRes = document.getElementById('card-res');
+    const errMsg = document.getElementById('err-msg');
+    const resetBtn = document.getElementById('reset-btn');
+    const btnDl = document.getElementById('btn-dl');
+    const btnPrev = document.getElementById('btn-prev');
+
+    let selectedFile = null;
+    let outputBlob = null;
+    let outputName = 'converted.html';
+    let previewURL = null;
+
+    // ── File selection ────────────────────────────────────────────
+    function formatBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+    }
+
+    function setFile(f) {
+    selectedFile = f;
+    fbName.textContent = f.name;
+    fbSize.textContent = formatBytes(f.size);
+    badge.classList.add('on');
+    convertBtn.disabled = false;
+    }
+
+    function clearFile() {
+    selectedFile = null;
+    badge.classList.remove('on');
+    convertBtn.disabled = true;
+    fileInput.value = '';
+    }
+
+    fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+    });
+    fbRm.addEventListener('click', clearFile);
+
+    // drag & drop
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+    dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+    });
+    dz.addEventListener('click', e => {
+    if (e.target !== fileInput && !e.target.classList.contains('dz-btn'))
+    fileInput.click();
+    });
+
+    // ── Step indicator helpers ────────────────────────────────────
+    const steps = ['ps-read', 'ps-parse', 'ps-assets', 'ps-html', 'ps-pack'];
+    function setStep(id) {
+    steps.forEach(s => {
+    const el = document.getElementById(s);
+    el.classList.remove('active', 'done');
+    });
+    let found = false;
+    for (const s of steps) {
+    const el = document.getElementById(s);
+    if (s === id) { el.classList.add('active'); found = true; } else if (!found) el.classList.add('done');
+    }
+    }
+    function completeSteps() {
+    steps.forEach(s => {
+    document.getElementById(s).classList.remove('active');
+    document.getElementById(s).classList.add('done');
+    });
+    }
+
+    function show(el) { el.classList.remove('hidden'); }
+    function hide(el) { el.classList.add('hidden'); }
+
+    // ── MHTML Parsing ─────────────────────────────────────────────
+    function extractBoundary(text) {
+    const m = text.match(/boundary=["']?([^"'\r\n;]+)["']?/i);
+    if (!m) throw new Error('No MIME boundary found in file. Is this a valid MHTML file?');
+    return m[1].trim();
+    }
+
+    function parseHeaderBlock(headerText) {
+    const hdrs = {};
+    const unfolded = headerText.replace(/\r?\n[ \t]+/g, ' ');
+    for (const line of unfolded.split(/\r?\n/)) {
+    const ci = line.indexOf(':');
+    if (ci > 0) {
+    const k = line.slice(0, ci).trim().toLowerCase();
+    const v = line.slice(ci + 1).trim();
+    if (!hdrs[k]) hdrs[k] = v; // first occurrence wins
+    }
+    }
+    return hdrs;
+    }
+
+    function decodeQP(body, charset) {
+    // Remove soft line breaks
+    let s = body.replace(/=\r\n/g, '').replace(/=\n/g, '');
+    // Decode =XX sequences
+    const bytes = [];
+    for (let i = 0; i < s.length; ) {
+    if (s[i] === '=' && i + 2 < s.length && /[0-9A-Fa-f]{2}/.test(s.slice(i+1, i+3))) {
+    bytes.push(parseInt(s.slice(i+1, i+3), 16));
+    i += 3;
+    } else {
+    bytes.push(s.charCodeAt(i));
+    i++;
+    }
+    }
+    try {
+    return new TextDecoder(charset || 'utf-8').decode(new Uint8Array(bytes));
+    } catch(_) {
+    return bytes.map(b => String.fromCharCode(b)).join('');
+    }
+    }
+
+    function b64ToDataURI(mime, b64) {
+    return `data:${mime};base64,${b64}`;
+    }
+
+    function textToB64(str) {
+    // UTF-8 safe btoa
+    try {
+    return btoa(unescape(encodeURIComponent(str)));
+    } catch(_) {
+    try { return btoa(str); } catch(_) { return ''; }
+    }
+    }
+
+    function parseMHTML(text) {
+    const boundary = extractBoundary(text);
+    const delimiter = '--' + boundary;
+    const rawParts = text.split(delimiter);
+
+    const sections = [];
+
+    for (let i = 1; i < rawParts.length; i++) {
+    const raw = rawParts[i];
+    // Skip end marker  (--boundary--)
+    if (/^--\s*(\r?\n|$)/.test(raw)) continue;
+
+    // Strip leading CRLF (the line break after the boundary)
+    const stripped = raw.replace(/^(\r\n|\r|\n)/, '');
+
+    // Split headers from body at first blank line
+    const sep = stripped.match(/^([\s\S]*?)(\r?\n\r?\n|\r\r)([\s\S]*)$/);
+    if (!sep) continue;
+
+    const headers = parseHeaderBlock(sep[1]);
+    let body = sep[3];
+    // Remove final trailing CRLF (before next boundary)
+    body = body.replace(/\r?\n$/, '');
+
+    const fullCT = headers['content-type'] || 'application/octet-stream';
+    const mimeType = fullCT.split(';')[0].trim().toLowerCase();
+    const charsetM = fullCT.match(/charset=["']?([^"';\s]+)/i);
+    const charset = charsetM ? charsetM[1].replace(/["']/g, ''): 'utf-8';
+    const enc = (headers['content-transfer-encoding'] || '').toLowerCase().trim();
+    const location = headers['content-location'] || '';
+    const cid = (headers['content-id'] || '').replace(/[<>]/g, '');
+
+    let textContent = null;
+    let base64Data = null;
+
+    if (enc === 'base64') {
+    base64Data = body.replace(/[\r\n\t ]/g, '');
+    if (mimeType.startsWith('text/')) {
+    try {
+    const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    textContent = new TextDecoder(charset).decode(bytes);
+    } catch(_) {
+    try { textContent = atob(base64Data); } catch(_) { textContent = body; }
+    }
+    }
+    } else if (enc === 'quoted-printable') {
+    textContent = decodeQP(body, charset);
+    base64Data = textToB64(textContent);
+    } else {
+    // 7bit / 8bit / identity — treat as-is
+    textContent = body;
+    base64Data = textToB64(body);
+    }
+
+    sections.push({ mimeType, charset, enc, location, cid, textContent, base64Data });
+    }
+
+    return sections;
+    }
+
+    // ── Asset map ─────────────────────────────────────────────────
+    function filenameFromURL(url) {
+    if (!url) return '';
+    try {
+    const u = new URL(url);
+    return u.pathname.split('/').pop() || '';
+    } catch(_) {
+    return url.split('/').pop().split('?')[0] || '';
+    }
+    }
+
+    function buildAssetMap(sections) {
+    const map = new Map();
+
+    for (const s of sections) {
+    if (!s.location && !s.cid) continue;
+    const dataURI = s.base64Data ? b64ToDataURI(s.mimeType, s.base64Data): '';
+    const entry = {
+    mimeType: s.mimeType,
+    text: s.textContent,
+    b64: s.base64Data,
+    dataURI,
+    filename: filenameFromURL(s.location) || (s.cid ? s.cid.split('@')[0]: 'asset'),
+    location: s.location,
+    };
+    if (s.location) map.set(s.location, entry);
+    if (s.cid)      map.set('cid:' + s.cid, entry);
+    }
+    return map;
+    }
+
+    function resolveAsset(url, map) {
+    if (!url) return null;
+    url = url.trim();
+    if (!url || url.startsWith('data:') || url.startsWith('#') || url.startsWith('javascript:')) return null;
+
+    if (map.has(url)) return map.get(url);
+
+    // Try URL-decoded
+    try {
+    const dec = decodeURIComponent(url);
+    if (map.has(dec)) return map.get(dec);
+    } catch(_) {}
+
+    // Strip query / fragment
+    const bare = url.split('?')[0].split('#')[0];
+    if (map.has(bare)) return map.get(bare);
+
+    // Filename-only fallback
+    const fn = bare.split('/').pop();
+    if (fn) {
+    for (const [k, v] of map) {
+    if (k.split('/').pop().split('?')[0] === fn) return v;
+    }
+    }
+    return null;
+    }
+
+    // ── CSS URL rewriting ─────────────────────────────────────────
+    function rewriteCSSURLs(css, map, mode, filenameMap) {
+    return css.replace(/url\(\s*(['"]?)([^'")\s]+)\1\s*\)/g, (match, q, url) => {
+    const asset = resolveAsset(url, map);
+    if (!asset) return match;
+    if (mode === 'embed') return `url("${asset.dataURI}")`;
+    const fn = filenameMap.get(asset) || asset.filename;
+    return `url("assets/${fn}")`;
+    });
+    }
+
+    // ── HTML rewriting ────────────────────────────────────────────
+    function rewriteHTML(html, assetMap, mode, filenameMap) {
+    // Helper: resolve and return replacement string
+    const resolveURL = (url) => {
+    const a = resolveAsset(url, assetMap);
+    if (!a) return null;
+    if (mode === 'embed') return a.dataURI;
+    return 'assets/' + (filenameMap ? filenameMap.get(a): a.filename);
+    };
+
+    // 1) src="..."
+    html = html.replace(/\bsrc=(['"])([^'"]+)\1/g, (m, q, url) => {
+    const r = resolveURL(url);
+    return r ? `src=${q}${r}${q}`: m;
+    });
+
+    // 2) srcset="..."
+    html = html.replace(/\bsrcset=(['"])([^'"]+)\1/g, (m, q, srcset) => {
+    const parts = srcset.split(',').map(p => {
+    const [u, ...rest] = p.trim().split(/\s+/);
+    const r = resolveURL(u);
+    return r ? [r, ...rest].join(' '): p.trim();
+    });
+    return `srcset=${q}${parts.join(', ')}${q}`;
+    });
+
+    // 3) <link ... href="..."> — stylesheets → inline; others → resolve
+    html = html.replace(/<link([^>]*?)>/gi, (match, attrs) => {
+    const hm = attrs.match(/href=(['"])([^'"]+)\1/);
+    if (!hm) return match;
+    const url = hm[2];
+    const asset = resolveAsset(url, assetMap);
+    if (!asset) return match;
+
+    const isCSS = /rel=["']?stylesheet/i.test(attrs);
+    if (isCSS && mode === 'embed' && asset.text) {
+    const processedCSS = rewriteCSSURLs(asset.text, assetMap, mode, filenameMap);
+    return `<style>${processedCSS}</style>`;
+    }
+    const newURL = mode === 'embed' ? asset.dataURI: 'assets/' + (filenameMap ? filenameMap.get(asset): asset.filename);
+    return match.replace(hm[0], `href="${newURL}"`);
+    });
+
+    // 4) <script src="...">
+  </script>
+  html = html.replace(/<script([^>
+    ]*?)\bsrc=(['"])([^'"]+)\2([^>]*)>\s*<\/script>/gi,
+      (match, before, q, url, after) => {
+      const asset = resolveAsset(url, assetMap);
+      if (!asset || !asset.text) return match;
+      if (mode === 'embed') {
+      const noSrc = (before + after).replace(/\s*\btype=(['"])[^'"]*\1/i, '').trim();
+      return `<script${noSrc ? ' '+noSrc : ''}>
+        ${asset.text}
+      </script>
+      `;
+      }
+      const fn = filenameMap ? filenameMap.get(asset) : asset.filename;
+      return match.replace(`src=${q}${url}${q}`, `src="assets/${fn}"`);
+      }
+      );
+
+      // 5) background="..."
+      html = html.replace(/\bbackground=(['"])([^'"]+)\1/g, (m, q, url) => {
+      const r = resolveURL(url);
+      return r ? `background=${q}${r}${q}` : m;
+      });
+
+      // 6) <style>
+        blocks
+        html = html.replace(/(<style[^>]*>)([\s\S]*?)(<\/style>)/gi, (m, open, css, close) =>
+        open + rewriteCSSURLs(css, assetMap, mode, filenameMap) + close
+        );
+
+        // 7) style="..." inline
+        html = html.replace(/\bstyle=(['"])([\s\S]*?)\1/g, (m, q, css) =>
+        `style=${q}${rewriteCSSURLs(css, assetMap, mode, filenameMap)}${q}`
+        );
+
+        // 8) Ensure charset meta is present
+        if (!/<meta[^>]+charset/i.test(html)) {
+        html = html.replace(/(<head[^>]*>)/i, '$1\n<meta charset="UTF-8">');
+        } else {
+        html = html.replace(/(<meta[^>]+charset=)(['"]?)[^'";\s>]*/gi, '$1$2UTF-8');
+        }
+
+        return html;
+        }
+
+        // ── Sanitised filenames for ZIP mode ─────────────────────────
+        function buildFilenameMap(sections, htmlIndex) {
+        const map = new Map();
+        const used = new Set(['index.html']);
+        let counter = 0;
+
+        for (let i = 0;
+        i < sections.length;
+        i++) {
+        if (i === htmlIndex) continue;
+        const s = sections[i];
+        let base = filenameFromURL(s.location) || (s.cid ? s.cid.split('@')[0]: 'asset');
+
+        // Sanitise
+        base = base.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^_+/, '');
+        if (!base) base = 'asset';
+        // Ensure extension
+        if (!base.includes('.') && s.mimeType !== 'application/octet-stream') {
+        const ext = s.mimeType.split('/')[1]?.split(';')[0] || 'bin';
+        base += '.' + ext.replace('jpeg','jpg').replace('svg+xml','svg');
+        }
+
+        let fn = base;
+        if (used.has(fn)) {
+        const dot = fn.lastIndexOf('.');
+        const stem = dot > 0 ? fn.slice(0, dot): fn;
+        const ext  = dot > 0 ? fn.slice(dot): '';
+        fn = `${stem}_${++counter}${ext}`;
+        }
+        used.add(fn);
+
+        // Build a fake "entry" keyed the same way as assetMap entries
+        const dummyEntry = {
+        mimeType: s.mimeType,
+        text: s.textContent,
+        b64: s.base64Data,
+        dataURI: s.base64Data ? b64ToDataURI(s.mimeType, s.base64Data): '',
+        filename: fn,
+        location: s.location,
+        };
+        map.set(dummyEntry, fn);
+        // We'll also re-use the real assetMap entry below; this is a lookup by object ref
+        }
+        return map;
+        }
+
+        // ── Stats ─────────────────────────────────────────────────────
+        function countStats(sections, htmlIndex) {
+        let images = 0;
+        const assets = sections.length - 1;
+        for (let i = 0;
+        i < sections.length;
+        i++) {
+        if (i === htmlIndex) continue;
+        if (sections[i].mimeType.startsWith('image/')) images++;
+        }
+        return { assets, images };
+        }
+
+        // ── Main conversion ───────────────────────────────────────────
+        async function sleep(ms) { return new Promise(r => setTimeout(r, ms));
+        }
+
+        async function convert() {
+        // Reset UI
+        hide(cardErr);
+        hide(cardRes);
+        show(cardProg);
+        resetBtn.classList.remove('on');
+        convertBtn.disabled = true;
+        outputBlob = null;
+        if (previewURL) { URL.revokeObjectURL(previewURL);
+        previewURL = null;
+        }
+
+        const format = document.querySelector('input[name="fmt"]:checked').value;
+
+        try {
+        // ── Step 1: Read ──────────────────────────────────────────
+        setStep('ps-read');
+        await sleep(60);
+
+        const fileText = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = () => rej(new Error('Could not read file'));
+        r.readAsText(selectedFile, 'utf-8');
+        });
+
+        // ── Step 2: Parse ─────────────────────────────────────────
+        setStep('ps-parse');
+        await sleep(40);
+
+        const sections = parseMHTML(fileText);
+        if (sections.length === 0) throw new Error('No MIME parts found. The file may not be a valid MHTML file.');
+
+        // Find main HTML section (first text/html part, or first section)
+        let htmlIndex = sections.findIndex(s => s.mimeType === 'text/html');
+        if (htmlIndex === -1) htmlIndex = 0;
+        const htmlSection = sections[htmlIndex];
+        if (!htmlSection.textContent) throw new Error('Could not decode HTML content from the MHTML file.');
+
+        // ── Step 3: Extract assets ────────────────────────────────
+        setStep('ps-assets');
+        await sleep(60);
+
+        const assetMap = buildAssetMap(sections);
+        // Remove the main HTML entry from asset map to avoid self-reference
+        if (htmlSection.location) assetMap.delete(htmlSection.location);
+
+        const { assets, images } = countStats(sections, htmlIndex);
+
+        // ── Step 4: Rewrite HTML ──────────────────────────────────
+        setStep('ps-html');
+        await sleep(40);
+
+        let finalHTML, outputBytes;
+
+        if (format === 'single') {
+        finalHTML = rewriteHTML(htmlSection.textContent, assetMap, 'embed', null);
+        const blob = new Blob([finalHTML], { type: 'text/html;charset=utf-8' });
+        outputBytes = blob.size;
+        outputName = selectedFile.name.replace(/\.mh(t|tml)$/i, '') + '.html';
+        outputBlob = blob;
+
+        } else {
+        // ZIP mode — build filename map first
+        // We need a map from assetMap entry → filename
+        const assetFilenameMap = new Map();
+        const used = new Set(['index.html']);
+        let cntr = 0;
+
+        for (const [, entry] of assetMap) {
+        if (assetFilenameMap.has(entry)) continue;
+        let base = entry.filename || 'asset';
+        base = base.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^_+/, '') || 'asset';
+        if (!base.includes('.')) {
+        const ext = entry.mimeType.split('/')[1]?.split(';')[0]?.replace('svg+xml','svg').replace('jpeg','jpg') || 'bin';
+        base += '.' + ext;
+        }
+        let fn = base;
+        if (used.has(fn)) {
+        const dot = fn.lastIndexOf('.');
+        const stem = dot > 0 ? fn.slice(0, dot): fn;
+        const ext  = dot > 0 ? fn.slice(dot): '';
+        fn = `${stem}_${++cntr}${ext}`;
+        }
+        used.add(fn);
+        assetFilenameMap.set(entry, fn);
+        }
+
+        finalHTML = rewriteHTML(htmlSection.textContent, assetMap, 'zip', assetFilenameMap);
+
+        // ── Step 5: Package ZIP ───────────────────────────────
+        setStep('ps-pack');
+        await sleep(40);
+
+        const zip = new JSZip();
+        zip.file('index.html', finalHTML);
+        const assetsFolder = zip.folder('assets');
+
+        for (const [, entry] of assetMap) {
+        const fn = assetFilenameMap.get(entry);
+        if (!fn) continue;
+        if (entry.b64) {
+        assetsFolder.file(fn, entry.b64, { base64: true });
+        } else if (entry.text) {
+        assetsFolder.file(fn, entry.text);
+        }
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        outputBytes = zipBlob.size;
+        outputName = selectedFile.name.replace(/\.mh(t|tml)$/i, '') + '.zip';
+        outputBlob = zipBlob;
+        }
+
+        // ── Step 5 (single) / finalize ────────────────────────────
+        if (format === 'single') {
+        setStep('ps-pack');
+        await sleep(40);
+        }
+
+        completeSteps();
+        await sleep(200);
+
+        // Show results
+        document.getElementById('s-assets').textContent = assets;
+        document.getElementById('s-images').textContent = images;
+        document.getElementById('s-size').textContent  = formatBytes(outputBytes);
+
+        // Preview only for single-page HTML
+        if (format === 'single') {
+        previewURL = URL.createObjectURL(outputBlob);
+        btnPrev.classList.remove('hidden');
+        } else {
+        btnPrev.classList.add('hidden');
+        }
+
+        hide(cardProg);
+        show(cardRes);
+        resetBtn.classList.add('on');
+
+        } catch (err) {
+        hide(cardProg);
+        errMsg.textContent = err.message || String(err);
+        show(cardErr);
+        resetBtn.classList.add('on');
+        convertBtn.disabled = false;
+        }
+        }
+
+        convertBtn.addEventListener('click', convert);
+
+        // ── Download ──────────────────────────────────────────────────
+        btnDl.addEventListener('click', () => {
+        if (!outputBlob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(outputBlob);
+        a.download = outputName;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        });
+
+        btnPrev.addEventListener('click', () => {
+        if (previewURL) window.open(previewURL, '_blank');
+        });
+
+        // ── Reset ─────────────────────────────────────────────────────
+        resetBtn.addEventListener('click', () => {
+        clearFile();
+        hide(cardProg);
+        hide(cardErr);
+        hide(cardRes);
+        resetBtn.classList.remove('on');
+        if (previewURL) { URL.revokeObjectURL(previewURL);
+        previewURL = null;
+        }
+        outputBlob = null;
+        // reset step states
+        steps.forEach(s => {
+        const el = document.getElementById(s);
+        el.classList.remove('active', 'done');
+        });
+        convertBtn.disabled = true;
+        });
+        </script>
+        </body>
+        </html>
