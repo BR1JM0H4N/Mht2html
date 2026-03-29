@@ -71,5 +71,5 @@ MIT — feel free to use and modify.
 
 ## 👨‍💻 Development & Repo
 
-- Developer: **Mht2html contributors**
-- Repository: update the footer link in `index.html` to your public repo URL when publishing.
+- Developer: **BR1JM0H4N**
+- Repository: https://github.com/BR1JM0H4N/Mht2html.git
