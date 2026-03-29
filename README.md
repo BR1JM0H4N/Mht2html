@@ -24,18 +24,22 @@ Drop in a saved web page and export it as:
 - ⚡ **Progress UI** with clear processing steps
 - 👀 **Preview + download** right from the browser
 - 📱 **Responsive dark UI**
+- 📲 **Installable PWA** with install prompt + offline shell caching
 
 ---
 
 ## 🚀 Quick Start
 
-1. Open `index.html` in your browser.
-2. Drag-and-drop an `.mht` / `.mhtml` file (or click **Browse Files**).
-3. Pick output format.
-4. Click **Convert →**.
-5. Download your converted result.
+1. Serve the project root over HTTP (for service-worker support), e.g. `python -m http.server 8080`.
+2. Open `http://localhost:8080/` in your browser.
+3. Drag-and-drop an `.mht` / `.mhtml` file (or click **Browse Files**).
+4. Pick output format.
+5. Click **Convert →**.
+6. Download your converted result.
 
-> No backend, no build step, no install required.
+> No backend and no build step required.
+
+For installation prompts, open the app over `http://` or `https://` (not directly via `file://`).
 
 ---
 
@@ -61,3 +65,11 @@ Drop in a saved web page and export it as:
 ## 📄 License
 
 MIT — feel free to use and modify.
+
+
+---
+
+## 👨‍💻 Development & Repo
+
+- Developer: **Mht2html contributors**
+- Repository: update the footer link in `index.html` to your public repo URL when publishing.
