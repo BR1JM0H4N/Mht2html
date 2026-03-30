@@ -7,6 +7,20 @@
   "display": "standalone",
   "background_color": "#0b0c10",
   "theme_color": "#0b0c10",
+  "categories": ["productivity", "utilities"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "message/rfc822": [".eml"],
+        "multipart/related": [".mht", ".mhtml"],
+        "application/octet-stream": [".mht", ".mhtml"]
+      }
+    }
+  ],
   "icons": [
     {
       "src": "icon-192.png",

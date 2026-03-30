@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mht2html-v1';
+const CACHE_NAME = 'mht2html-v2';
 const APP_SHELL = [
   './',
   './index.html',
