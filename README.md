@@ -20,11 +20,13 @@ Drop in a saved web page and export it as:
 
 - 🧠 **100% client-side** conversion (your file never leaves your machine)
 - 📦 **Two output modes**: embedded single-file HTML or ZIP package
+- 🗂️ **Bulk conversion**: convert many `.mht/.mhtml` files in one run and download all results as a single ZIP
 - 🖼️ **Asset rewriting** for `src`, `srcset`, CSS `url(...)`, inline styles, and linked stylesheets
 - ⚡ **Progress UI** with clear processing steps
 - 👀 **Preview + download** right from the browser
 - 📱 **Responsive dark UI**
 - 📲 **Installable PWA** with install prompt + offline shell caching
+- 🧭 **PWA file handling hooks** for OS-level **Open with Mht2html** on supported Chromium-based systems
 
 ---
 
@@ -32,7 +34,7 @@ Drop in a saved web page and export it as:
 
 1. Serve the project root over HTTP (for service-worker support), e.g. `python -m http.server 8080`.
 2. Open `http://localhost:8080/` in your browser.
-3. Drag-and-drop an `.mht` / `.mhtml` file (or click **Browse Files**).
+3. Drag-and-drop one or more `.mht` / `.mhtml` files (or click **Browse Files**).
 4. Pick output format.
 5. Click **Convert →**.
 6. Download your converted result.

@@ -639,13 +639,14 @@
           </svg>
         </span>
         <div class="dz-title">
-          Drop your .mht / .mhtml file here
+          Drop your .mht / .mhtml files here
         </div>
         <div class="dz-sub">
-          Saved web pages from Chrome, Edge, IE, Firefox<br>or Outlook MHTML emails
+          Saved web pages from Chrome, Edge, IE, Firefox<br>or Outlook MHTML emails (single or bulk)
         </div>
         <label class="dz-btn" for="file-input">Browse Files</label>
-        <input type="file" id="file-input" accept=".mht,.mhtml,.mhtml,.eml">
+        <input type="file" id="file-input" accept=".mht,.mhtml,.mhtml,.eml" multiple>
+        <div class="dz-sub" style="margin-top:12px">Tip: install the app to enable <strong>Open with Mht2html</strong> on supported Chromium browsers.</div>
       </div>
       <div class="file-badge" id="file-badge">
         <div class="fb-icon">
@@ -831,7 +832,7 @@
     const installBanner = document.getElementById('install-banner');
     const installBtn = document.getElementById('install-btn');
 
-    let selectedFile = null;
+    let selectedFiles = [];
     let outputBlob = null;
     let outputName = 'converted.html';
     let previewURL = null;
@@ -843,23 +844,32 @@
     return (n/1024/1024).toFixed(2) + ' MB';
     }
 
-    function setFile(f) {
-    selectedFile = f;
-    fbName.textContent = f.name;
-    fbSize.textContent = formatBytes(f.size);
+    function setFiles(filesLike) {
+    selectedFiles = Array.from(filesLike || []).filter(Boolean);
+    if (!selectedFiles.length) {
+    badge.classList.remove('on');
+    convertBtn.disabled = true;
+    return;
+    }
+
+    const totalBytes = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+    fbName.textContent = selectedFiles.length === 1
+      ? selectedFiles[0].name
+      : `${selectedFiles.length} files selected`;
+    fbSize.textContent = `${formatBytes(totalBytes)} total`;
     badge.classList.add('on');
     convertBtn.disabled = false;
     }
 
     function clearFile() {
-    selectedFile = null;
+    selectedFiles = [];
     badge.classList.remove('on');
     convertBtn.disabled = true;
     fileInput.value = '';
     }
 
     fileInput.addEventListener('change', () => {
-    if (fileInput.files[0]) setFile(fileInput.files[0]);
+    if (fileInput.files.length) setFiles(fileInput.files);
     });
     fbRm.addEventListener('click', clearFile);
 
@@ -869,8 +879,8 @@
     dz.addEventListener('drop', e => {
     e.preventDefault();
     dz.classList.remove('over');
-    const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
+    const files = e.dataTransfer.files;
+    if (files.length) setFiles(files);
     });
     dz.addEventListener('click', e => {
     if (e.target !== fileInput && !e.target.classList.contains('dz-btn'))
@@ -1169,52 +1179,6 @@
         return html;
         }
 
-        // ── Sanitised filenames for ZIP mode ─────────────────────────
-        function buildFilenameMap(sections, htmlIndex) {
-        const map = new Map();
-        const used = new Set(['index.html']);
-        let counter = 0;
-
-        for (let i = 0;
-        i < sections.length;
-        i++) {
-        if (i === htmlIndex) continue;
-        const s = sections[i];
-        let base = filenameFromURL(s.location) || (s.cid ? s.cid.split('@')[0]: 'asset');
-
-        // Sanitise
-        base = base.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^_+/, '');
-        if (!base) base = 'asset';
-        // Ensure extension
-        if (!base.includes('.') && s.mimeType !== 'application/octet-stream') {
-        const ext = s.mimeType.split('/')[1]?.split(';')[0] || 'bin';
-        base += '.' + ext.replace('jpeg','jpg').replace('svg+xml','svg');
-        }
-
-        let fn = base;
-        if (used.has(fn)) {
-        const dot = fn.lastIndexOf('.');
-        const stem = dot > 0 ? fn.slice(0, dot): fn;
-        const ext  = dot > 0 ? fn.slice(dot): '';
-        fn = `${stem}_${++counter}${ext}`;
-        }
-        used.add(fn);
-
-        // Build a fake "entry" keyed the same way as assetMap entries
-        const dummyEntry = {
-        mimeType: s.mimeType,
-        text: s.textContent,
-        b64: s.base64Data,
-        dataURI: s.base64Data ? b64ToDataURI(s.mimeType, s.base64Data): '',
-        filename: fn,
-        location: s.location,
-        };
-        map.set(dummyEntry, fn);
-        // We'll also re-use the real assetMap entry below; this is a lookup by object ref
-        }
-        return map;
-        }
-
         // ── Stats ─────────────────────────────────────────────────────
         function countStats(sections, htmlIndex) {
         let images = 0;
@@ -1232,71 +1196,41 @@
         async function sleep(ms) { return new Promise(r => setTimeout(r, ms));
         }
 
-        async function convert() {
-        // Reset UI
-        hide(cardErr);
-        hide(cardRes);
-        show(cardProg);
-        resetBtn.classList.remove('on');
-        convertBtn.disabled = true;
-        outputBlob = null;
-        if (previewURL) { URL.revokeObjectURL(previewURL);
-        previewURL = null;
-        }
-
-        const format = document.querySelector('input[name="fmt"]:checked').value;
-
-        try {
-        // ── Step 1: Read ──────────────────────────────────────────
-        setStep('ps-read');
-        await sleep(60);
-
+        async function convertSingleFile(file, format) {
         const fileText = await new Promise((res, rej) => {
         const r = new FileReader();
         r.onload = () => res(r.result);
         r.onerror = () => rej(new Error('Could not read file'));
-        r.readAsText(selectedFile, 'utf-8');
+        r.readAsText(file, 'utf-8');
         });
-
-        // ── Step 2: Parse ─────────────────────────────────────────
-        setStep('ps-parse');
-        await sleep(40);
 
         const sections = parseMHTML(fileText);
         if (sections.length === 0) throw new Error('No MIME parts found. The file may not be a valid MHTML file.');
 
-        // Find main HTML section (first text/html part, or first section)
         let htmlIndex = sections.findIndex(s => s.mimeType === 'text/html');
         if (htmlIndex === -1) htmlIndex = 0;
         const htmlSection = sections[htmlIndex];
         if (!htmlSection.textContent) throw new Error('Could not decode HTML content from the MHTML file.');
 
-        // ── Step 3: Extract assets ────────────────────────────────
-        setStep('ps-assets');
-        await sleep(60);
-
         const assetMap = buildAssetMap(sections);
-        // Remove the main HTML entry from asset map to avoid self-reference
         if (htmlSection.location) assetMap.delete(htmlSection.location);
 
         const { assets, images } = countStats(sections, htmlIndex);
-
-        // ── Step 4: Rewrite HTML ──────────────────────────────────
-        setStep('ps-html');
-        await sleep(40);
-
-        let finalHTML, outputBytes;
+        let finalHTML;
 
         if (format === 'single') {
         finalHTML = rewriteHTML(htmlSection.textContent, assetMap, 'embed', null);
         const blob = new Blob([finalHTML], { type: 'text/html;charset=utf-8' });
-        outputBytes = blob.size;
-        outputName = selectedFile.name.replace(/\.mh(t|tml)$/i, '') + '.html';
-        outputBlob = blob;
+        return {
+        blob,
+        outputName: file.name.replace(/\.mh(t|tml)$/i, '') + '.html',
+        outputBytes: blob.size,
+        assets,
+        images,
+        previewHTML: finalHTML,
+        };
+        }
 
-        } else {
-        // ZIP mode — build filename map first
-        // We need a map from assetMap entry → filename
         const assetFilenameMap = new Map();
         const used = new Set(['index.html']);
         let cntr = 0;
@@ -1322,10 +1256,6 @@
 
         finalHTML = rewriteHTML(htmlSection.textContent, assetMap, 'zip', assetFilenameMap);
 
-        // ── Step 5: Package ZIP ───────────────────────────────
-        setStep('ps-pack');
-        await sleep(40);
-
         const zip = new JSZip();
         zip.file('index.html', finalHTML);
         const assetsFolder = zip.folder('assets');
@@ -1341,32 +1271,73 @@
         }
 
         const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-        outputBytes = zipBlob.size;
-        outputName = selectedFile.name.replace(/\.mh(t|tml)$/i, '') + '.zip';
-        outputBlob = zipBlob;
+        return {
+        blob: zipBlob,
+        outputName: file.name.replace(/\.mh(t|tml)$/i, '') + '.zip',
+        outputBytes: zipBlob.size,
+        assets,
+        images,
+        previewHTML: null,
+        };
         }
 
-        // ── Step 5 (single) / finalize ────────────────────────────
-        if (format === 'single') {
+        async function convert() {
+        hide(cardErr);
+        hide(cardRes);
+        show(cardProg);
+        resetBtn.classList.remove('on');
+        convertBtn.disabled = true;
+        outputBlob = null;
+        if (previewURL) { URL.revokeObjectURL(previewURL);
+        previewURL = null;
+        }
+
+        const format = document.querySelector('input[name="fmt"]:checked').value;
+
+        try {
+        setStep('ps-read');
+        await sleep(60);
+
+        const results = [];
+        for (const file of selectedFiles) {
+        setStep('ps-parse');
+        await sleep(20);
+        setStep('ps-assets');
+        await sleep(20);
+        setStep('ps-html');
+        await sleep(20);
         setStep('ps-pack');
-        await sleep(40);
+        const result = await convertSingleFile(file, format);
+        results.push(result);
         }
 
-        completeSteps();
-        await sleep(200);
+        const totalAssets = results.reduce((sum, r) => sum + r.assets, 0);
+        const totalImages = results.reduce((sum, r) => sum + r.images, 0);
 
-        // Show results
-        document.getElementById('s-assets').textContent = assets;
-        document.getElementById('s-images').textContent = images;
-        document.getElementById('s-size').textContent  = formatBytes(outputBytes);
-
-        // Preview only for single-page HTML
+        if (results.length === 1) {
+        outputBlob = results[0].blob;
+        outputName = results[0].outputName;
         if (format === 'single') {
         previewURL = URL.createObjectURL(outputBlob);
         btnPrev.classList.remove('hidden');
         } else {
         btnPrev.classList.add('hidden');
         }
+        document.getElementById('s-size').textContent = formatBytes(results[0].outputBytes);
+        } else {
+        const bulkZip = new JSZip();
+        results.forEach((r) => bulkZip.file(r.outputName, r.blob));
+        outputBlob = await bulkZip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        outputName = `mht2html-bulk-${Date.now()}.zip`;
+        btnPrev.classList.add('hidden');
+        document.getElementById('s-size').textContent = formatBytes(outputBlob.size);
+        }
+
+        completeSteps();
+        await sleep(180);
+
+        document.getElementById('s-assets').textContent = totalAssets;
+        document.getElementById('s-images').textContent = totalImages;
 
         hide(cardProg);
         show(cardRes);
@@ -1416,6 +1387,22 @@
         convertBtn.disabled = true;
         });
 
+
+
+    // Handle OS-level "Open with" file launches for installed PWAs.
+    if ('launchQueue' in window && typeof LaunchParams !== 'undefined' && 'files' in LaunchParams.prototype) {
+      launchQueue.setConsumer(async (launchParams) => {
+        if (!launchParams.files?.length) return;
+        const openedFiles = [];
+        for (const handle of launchParams.files) {
+          if (!handle || typeof handle.getFile !== 'function') continue;
+          try {
+            openedFiles.push(await handle.getFile());
+          } catch (_) {}
+        }
+        if (openedFiles.length) setFiles(openedFiles);
+      });
+    }
 
     // ── PWA install / service worker ─────────────────────────────
     let deferredPrompt = null;
